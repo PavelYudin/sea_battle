@@ -1,0 +1,615 @@
+<!doctype html>
+<html>
+<head>
+	<link type="text/css" rel="stylesheet" href="style/style.css" media="screen"/>
+	<meta charset="UTF-8"/>
+	<title>Морской бой!</title></title>
+</head>
+<body>
+	<a class='button5' data-vk id='play'>Играть</a>
+	<div id='time'></div>
+	<div id='setting'>	
+		<div id='players'>
+			<label>Первый ход</label>
+			<br>
+			<label for='player'>Игрок</label>
+			<input id='player' type='radio' data-player='Ваш ход' onfocus='pc.checked=false;' checked>
+			<label for='pc'>Компьютер</label>
+			<input id='pc' type='radio' data-player='Ход противника' onfocus='player.checked=false;'>
+		</div>	
+		<div id='complexity'>
+			<label>Сложность</label>
+			<br>
+			<label for='easy'>Легко</label>
+			<input id='easy' type='radio' data-seconds='8' checked onfocus='medium.checked=false;hard.checked=false;'>
+			<label for='medium'>Средне</label>
+			<input id='medium' type='radio' data-seconds='6' onfocus='easy.checked=false;hard.checked=false;'>
+			<label for='hard'>Тяжело</label>
+			<input id='hard' type='radio' data-seconds='8' onfocus='easy.checked=false;medium.checked=false;'>
+		</div>
+		<label for='autoplay'>Авторасстановка</label>
+		<input id='autoplay' type='checkbox' checked>	
+	</div>
+	<script>
+		"use strict";
+		function Label(text1,text2,text3,text4){
+			this.div_label=document.createElement('div');		
+			this.div_label.classList.add('div_label');
+			document.body.appendChild(this.div_label);
+			this.title1=text1;
+			this.title2=text2;
+			this.exit1=text3;
+			this.exit2=text4;
+		}
+		let label=new Label('Ваш ход','Ход соперника','Вы выиграли!','Вы проиграли');
+		function Battlefield(){ //функция для создния поля боя
+			this.div=document.createElement('div');
+			this.div.classList.add("battlefield");
+			document.body.appendChild(this.div);
+			this.div.style.width=this.div.getBoundingClientRect().height+'px';
+			if(arguments[0]){this.div.style.right='10%';}else{this.div.style.left='10%';}
+			for(let i=0;i<100;i++){
+				let grid=document.createElement('div');
+				grid.classList.add("grid");	
+				this.div.appendChild(grid);
+				this.div.children[i].name=i;
+				this.div.children[i].id=i;
+			}
+			this.array=[];//массив кораблей
+			this.kil_array=[];//массив для подбитых частей корабля
+		}
+		Battlefield.random=function(min,max){
+				return Math.round(min - 0.5 + Math.random() * (max - min + 1));
+		}
+		Battlefield.prototype.paint=function(array,color){
+			for(let i=0;i<array.length;i++){
+				this.div.children[array[i]].style.backgroundColor=color;
+			}
+		}
+		Battlefield.prototype.getBoundingClientRect=function(){
+			return this.div.children[0].getBoundingClientRect();
+		}
+		Battlefield.prototype.check=function(){
+			let del_elem=(n)=>{
+				for(let i=1;i<arguments.length;i++){
+					let index=String(arguments[i]).lastIndexOf(n)
+					if(index!=-1 && ((String(arguments[i]).length==2 && index==1) || (String(arguments[i]).length==1 && index==0))){
+						Array.prototype.splice.call(arguments,i,1);i=1;
+					}
+				}
+			}
+			let zero=String(arguments[0]).indexOf('0');
+			let nine=String(arguments[0]).indexOf('9');
+			if(String(arguments[0]).indexOf('0')!=-1  ){//если содержит 0
+				del_elem('9');
+			}else if(String(arguments[0]).indexOf('9')!=-1){
+				del_elem('0');
+			}
+			for(let j=0;j<arguments.length;j++){
+				for(let i =0;i<this.array.length;i++){
+					if(this.array[i].indexOf(arguments[j])!=-1){return i;}
+				}
+			}	
+			return -1;
+		} 
+		Battlefield.prototype.createShip=function(kol,view,id,orientation){//id and orientation для ручной расстановки
+			var buf_array=[];
+			var self=this;
+			var position;
+		if(id!=undefined){position=orientation;}else{position=Battlefield.random(0,1);}// позиция корабля на поле:0 по вертикали,1 по горизонтали
+			function horizontal(elem,a,step){
+				if(self.check(elem+a,elem+a*2,elem+a+step,elem+a-step,elem+a*2-step,elem+a*2+step)==-1 && elem+a>=0 && elem+a<100){
+					if((String(elem).length>1 && (String(elem+a)[0]==String(elem)[0]) && Math.abs(a)==1 || Math.abs(a)==10) || (String(elem).length==1 && (Math.abs(a)==10 || Math.abs(a)==1) && elem+a<10 && elem+a>=0)){
+						if(a<0){buf_array.unshift(elem+a);return true;}
+						if(a>0){buf_array.push(elem+a);return true;}
+					}
+				}
+				animation();
+				return false;
+			}
+			let animation=()=>{
+				if(id!=undefined){
+					label.div_label.innerHTML='Корабли не должны друг друга касаться!';
+					setTimeout(()=>{label.div_label.innerHTML=''},2000);
+					return false;
+				}
+			}
+			
+			for(let k=0;k<kol;k++){
+				buf_array=[];// очищаем временный массив для кораблей
+				var rand;
+			if(id!=undefined){rand=id;}else{rand=Battlefield.random(0,99);}
+				while(this.check(rand,rand+1,rand-1,rand-10,rand+10,rand+1-10,rand+1+10,rand-1-10,rand-1+10)!=-1){
+					if(id!=undefined){animation();return;}
+					rand=Battlefield.random(0,99);
+				}
+				buf_array.push(rand);
+				if(view<2){   //если однопалубники
+					this.kil_array.push([]);
+					this.array.push(buf_array); //добавляем в массив кораблей
+					if(this!=battlefield2){this.paint(buf_array,'yellow');}//неподкрашивая корабли противника
+					buf_array=[];// очищаем временный массив для кораблей
+				}else{
+					
+					for(let i=1;i<view;i++){
+						if(position){ // если по горизонтали ставим
+							if(!horizontal(buf_array[buf_array.length-1],1,10)){//c + просчет
+								if(id!=undefined){return false;}
+								if(id==undefined && !horizontal(buf_array[0],-1,10)){//c - просчет
+									--k;break;
+								}		
+							}
+						}else{//по вертикали
+							if(!horizontal(buf_array[buf_array.length-1],10,1)){//c + просчет
+								if(id!=undefined){return false;}
+								if(id==undefined && !horizontal(buf_array[0],-10,1)){//c - просчет
+									--k;break;
+								}	
+							} 
+						}
+					}
+				}
+				if(buf_array.length==view){
+					this.kil_array.push([]);
+					this.array.push(buf_array);
+					if(this==battlefield1)this.paint(buf_array,'yellow');//неподкрашивая корабли противника
+				}
+			}	
+			return true;
+		}
+		var battlefield1=new Battlefield();// мое поле
+		battlefield1.sizeShip=null;//размер корабля который надо поставить на мое поле
+		battlefield1.kill_me=[];// массив для всех попаланий по мне(координаты)
+		battlefield1.position_push;//позиция,определяет в какую сторону двигаться когда стрелять
+		battlefield1.push;//определяет последний удар попал или нет при средней сложности 
+		var battlefield2=new Battlefield(1);// вражеское поле
+		battlefield2.createShip(4,1);
+		battlefield2.createShip(1,4);
+		battlefield2.createShip(2,3);
+		battlefield2.createShip(3,2);
+		battlefield2.createAim=function(e){ //метод создания прицела
+			let div=this.div.getBoundingClientRect();
+			this.aim=document.createElement('div');//прицел (большой круг)
+			this.div.appendChild(this.aim);//добавля
+			this.aim.id='aim';			
+			this.aim.style.width=this.getBoundingClientRect().width+'px';
+			this.aim.style.height=this.getBoundingClientRect().height+'px';
+			this.aim.style.display='none';
+			var circle=document.createElement('div');//созд малый круг прицела
+			this.aim.appendChild(circle);
+			circle.id='child';
+			circle.style.width=this.getBoundingClientRect().width-20+'px';
+			circle.style.height=this.getBoundingClientRect().height-20+'px';
+			var line1=document.createElement('div');// гориз линия
+			line1.classList.add("line");
+			this.aim.appendChild(line1);
+			line1.style.width=this.aim.style.width;
+			var line2=document.createElement('div'); //вертик линия
+			line2.classList.add("line");
+			this.aim.appendChild(line2);
+			line2.style.height=this.aim.style.width;
+		}
+		battlefield2.createAim();
+		Battlefield.prototype.hit=function(e){// метод для убийства вражеских кораблей
+			function perimeter(Index){// по периметру убитого корбля координаты заношу в массив,что бы не стрелять около корабля
+				let znak=[-1,1,-10,10];
+				for(let i=0;i<this.kil_array[Index].length;i++){
+					for(let j=0;j<4;j++){
+						if(this.kill_me.indexOf(this.kil_array[Index][i]+znak[j])==-1 && this.kil_array[Index][i]+znak[j]>-1 && this.kil_array[Index][i]+znak[j]<100){
+							this.kill_me.push(this.kil_array[Index][i]+znak[j]);
+						}
+					}
+				}
+			}
+			function animate_kill2(Index){
+				for(let i=0;i<this.kil_array[Index].length;i++){
+					this.div.children[this.kil_array[Index][i]].style.backgroundColor='';
+					this.div.children[this.kil_array[Index][i]].classList.add('img');
+				}
+				this.kil_array.splice(Index,1);
+			}
+			function animate_kill(Index){//анимация пропадания корабля
+				var i=9;//opacity
+				var timerId1 = setTimeout((function tick() {	
+				for(let j=0;j<this.kil_array[Index].length;j++){
+					this.div.children[this.kil_array[Index][j]].style.opacity=i/10;}
+					i-=1;
+					if(i==3){
+						clearTimeout(timerId1);
+						for(let j=0;j<this.kil_array[Index].length;j++){
+							this.div.children[this.kil_array[Index][j]].style.backgroundColor="#9abff3";
+							this.div.children[this.kil_array[Index][j]].style.opacity=1;}
+						this.kil_array.splice(Index,1);//очищаем массив для временных подбитых кораблей
+						return;}
+					timerId1 = setTimeout(tick.bind(this), 200);
+				}).bind(this), 1000);
+			}
+			if(Battlefield.chet=='pc'  && this==battlefield2 || !Battlefield.chet){return;}// если в данный момент ход компьютера или конец игры я не могу ударить
+			let id=null;
+			if(typeof e=='object'){//если я стреляю
+				 id=Array.prototype.indexOf.call(this.div.children,e.target);//определяем по какой ячейке попал
+				
+				 if(id==-1)return;
+			}else{
+				id=e;//если комп стреляет	
+			}		
+			let Index=this.check(id);//в каком массиве this.array содержится
+			if(Index!=-1){ //если попал по кораблю
+				if(this==battlefield1)battlefield1.push=1;//попал по кораблю
+				let index=this.array[Index].indexOf(id);//порядк.номер в массиве 
+				this.div.children[id].style.backgroundColor="red";	
+				this.kil_array[Index].push(id);//добавляем убитые части корабля в массив
+				this.array[Index].splice(index,1);//удаляем элемент из массива кораблей	
+				if(!this.array[Index].length){//если массив корабля пустой
+					this.array.splice(Index,1);
+					if(this==battlefield1){perimeter.call(this,Index);}
+					if(this==battlefield1 || Battlefield.complexity=='medium' || Battlefield.complexity=='easy'){
+						animate_kill2.call(this,Index);	
+					}else{animate_kill.call(this,Index);}	
+				}
+				if(!this.array.length){ //если все корабли убиты
+					Battlefield.chet=0;
+					return;
+				}	
+			}else{//если промахнулся по кораблю
+				if(this==battlefield1)battlefield1.push=0;
+				let div=document.createElement('div');
+				div.classList.add('miss');
+				this.div.children[id].appendChild(div);
+			}
+			if(this==battlefield2){//возвращаем прицел на прежние место после того как выстрелил
+				this.div.dispatchEvent(new MouseEvent('mousemove',{
+										clientX:this.aim.clientX,
+										clientY:this.aim.clientY})
+										);
+			}
+			Battlefield.chet='pc';
+			Battlefield.sec=10;
+		}
+		battlefield1.hit_me=function(complexity){//метод для убийства своих кораблей
+		function easy(){
+			if(arguments[0]==undefined){
+				do{
+					var rand=Battlefield.random(0,99);//arguments[0] координатат для попаданию по кораблю
+				}while(this.kill_me.indexOf(rand)!=-1)// что бы повторно не бил по тем же координатам
+			}else{
+				rand=arguments[0];
+			}
+			this.kill_me.push(rand);//добавляю в массив координаты по которым уже стрельнул
+			this.hit(rand);
+		}
+		switch (complexity){	
+			case 'easy':
+				easy.call(this);
+				break;
+			case 'medium':
+				medium.call(this);
+				break;
+			case 'hard':
+				hard.call(this);
+				break;
+		}	
+		function hard(){
+			for(let i=0;i<this.kil_array.length;i++){
+				if(this.kil_array[i].length){
+					medium.call(this);
+					return;
+				}
+			}
+			let y=Battlefield.random(0,1);
+				if(y){//если 1 то четко по кораблю попадаем
+					hard.rand=Battlefield.random(0,this.array.length-1);//определяем по какому кораблю ударим
+					let rand=Battlefield.random(0,this.array[hard.rand].length-1);//по какой части корабля ударить
+					easy.call(this,this.array[hard.rand][rand]);				
+				}else{
+					easy.call(this);		
+				}
+		}	
+			function medium(){//среднюю сложность прописываю
+				function c(elem,rand){//для проверки когда бью по кораблю что бы с противоположной стороны удар не вышел когда корабль к стенке стоит		
+					if(String(elem).length==2){
+						if((String(elem)[1]=='0' && rand==-1) || (String(elem)[1]=='9' && rand==1)){
+							return false;
+						}
+					}
+					return true;
+				}
+				let push=[10,-1,-10,1];
+				for(let i=0;i<this.kil_array.length;i++){
+					let elem=this.kil_array[i];
+					if(elem.length==1){//если подбит только один раз(одна ячейка)	
+						do{
+							let rand=Battlefield.random(0,3);//определяю в какую сторону бить			
+							if(!c(elem[0],push[rand])){rand=100;};
+							if(elem[0]+push[rand]>=0 && elem[0]+push[rand]<100 && this.kill_me.indexOf(elem[0]+push[rand])==-1){//если еще по этой координате не бил и она > 0 и <100
+								this.kill_me.push(elem[0]+push[rand]);//добавляю в массив координаты по которым уже стрельнул
+								this.hit(elem[0]+push[rand]);
+								battlefield1.position_push=push[rand];
+								return;
+							}
+						}while(true)
+					}else{
+						if(elem.length>1){//если подбит уже не один раз
+						
+						if(battlefield1.push){//в последний раз попал или нет
+							elem=elem[elem.length-1];
+						}else{
+							if(battlefield1.position_push<0){
+								elem=Math.max.apply(null,elem);battlefield1.position_push=Math.abs(battlefield1.position_push);
+							}else{
+								elem=Math.min.apply(null,elem);battlefield1.position_push=-battlefield1.position_push;
+							}
+						}
+						do{
+							if(c(elem,battlefield1.position_push) && elem+battlefield1.position_push>=0 && elem+battlefield1.position_push<100 && this.kill_me.indexOf(elem+battlefield1.position_push)==-1){
+								this.kill_me.push(elem+battlefield1.position_push);//добавляю в массив координаты по которым уже стрельнул
+								this.hit(elem+battlefield1.position_push);	k=0;
+								return;
+							}else{
+								if(battlefield1.position_push<0){
+									elem=Math.max.apply(null,this.kil_array[i]);
+									battlefield1.position_push=Math.abs(battlefield1.position_push);
+								}else{
+									elem=Math.min.apply(null,this.kil_array[i]);
+									battlefield1.position_push=-battlefield1.position_push;
+								}			
+							}
+						}while(true)								
+					}
+				}
+			}		
+				easy.call(this);//если подбитых кораблей нет бьем наобум
+			}
+		}
+		var k=0;
+		battlefield2.div.addEventListener("mousedown",(function(e){ //событие мыши временное удаления прицела для убийства вражеских кораблей
+			if(this.div.contains(this.aim)){
+				this.aim.style.display='none';
+				this.aim.clientX=e.clientX;
+				this.aim.clientY=e.clientY;
+			}
+		}).bind(battlefield2));
+		battlefield2.div.addEventListener("mouseup",battlefield2.hit.bind(battlefield2));//удар по вражеским кораблям
+		battlefield2.div.addEventListener("mousemove",(function(e){//движение мыши на вражеском поле
+			if(this.aim.style.display=='none'){this.aim.style.display='';}
+				let aim=this.aim.getBoundingClientRect(),div=this.div.getBoundingClientRect();
+				if(e.clientX<=div.right && e.clientX>=div.left && e.clientY>=div.top && e.clientY<=div.bottom){
+					this.aim.style.top=e.clientY-parseInt(this.aim.style.height)/2+'px';
+					this.aim.style.left=e.clientX-parseInt(this.aim.style.width)/2+'px';
+					//
+			
+				}else{this.aim.style.display='none';}
+		}).bind(battlefield2),true);
+		var r;
+		var timerId;
+		function go(complexity,seconds){
+		function period(){
+			if(Battlefield.sec<10){
+				time.innerHTML='00:0'+Battlefield.sec;
+			}else{
+				time.innerHTML='00:'+Battlefield.sec;
+			}
+		}
+		function exit(){
+			if(!battlefield2.array.length){
+				label.div_label.innerHTML=label.exit1;}else{
+				for(let i=0;i<battlefield2.array.length;i++){
+					battlefield2.paint(battlefield2.array[i],'yellow');//в конце игры показываю где остались стоять вражеские корабли
+				}
+				label.div_label.innerHTML=label.exit2;
+			}
+			time.innerHTML='';clearInterval(timerId);return;
+		}
+			if(!r){r=Battlefield.random(seconds,10);}
+			if(Battlefield.chet==0){exit();}
+			if(Battlefield.sec<1){
+				if(Battlefield.chet=='pc'){
+					Battlefield.chet='player';
+				}else if(Battlefield.chet=='player'){Battlefield.chet='pc';}
+				Battlefield.sec=10;
+			}
+			period();
+			if(Battlefield.chet=='pc'){
+				label.div_label.innerHTML=label.title2;
+				if(r==Battlefield.sec){
+					battlefield1.hit_me(complexity);
+					if(Battlefield.chet==0){exit();return;}
+					Battlefield.sec=10;
+					period();
+					r=Battlefield.random(seconds,10);
+					Battlefield.chet='player';
+					label.div_label.innerHTML=label.title1;
+					return;
+				}
+			}
+			Battlefield.sec--;
+		}
+		play.onclick=function(){
+		handmade.animation(1,0);//анимация для скрытия кораблей для расстановки
+		battlefield1.div.style.zIndex='1';//скрытие панели расстановки кораблей при авторасстановке
+			function choice(){
+				let player=players.getElementsByTagName('input');
+				for(let i=0;i<player.length;i++){
+					if(player[i].checked){
+						Battlefield.chet=player[i].id;//кто ходит
+						label.div_label.innerHTML=player[i].dataset.player;
+					}
+				}
+			}
+			function _complexity(){
+				let Сomplexity=complexity.getElementsByTagName('input');
+				for(let i=0;i<Сomplexity.length;i++){
+					if(Сomplexity[i].checked){
+						return {level:Сomplexity[i].id,
+								sec:Сomplexity[i].dataset}// level
+					}
+				}
+			}
+			function autodistinction(){//как ставить свои корабли
+			function clear_ship(){
+				for(let i=0;i<battlefield1.array.length;i++){
+					battlefield1.paint(battlefield1.array[i],'');
+				}
+				battlefield1.array=[];//массив кораблей
+				battlefield1.kil_array=[];//массив для подбитых частей корабля
+			}
+				if(autoplay.checked){
+					clear_ship();
+					battlefield1.createShip(4,1);
+					battlefield1.createShip(1,4);
+					battlefield1.createShip(2,3);
+					battlefield1.createShip(3,2);
+			
+				}
+			}
+			autodistinction();//авторасстановка кораблей своих
+			if(!battlefield1.array.length){alert('Расставьте корабли');return;}
+			 let{level,sec}=_complexity();//какой уровень
+			Battlefield.complexity=level;
+			let seconds=sec.seconds;
+			choice();//кто ходит
+			Battlefield.sec=10;
+			timerId=setInterval(go,1000,Battlefield.complexity,+seconds);
+			this.classList.add('disabled');
+			let setting=document.createElement('div');
+			setting.style.backgroundColor='#D3D3D3';
+			setting.style.opacity='0.5';
+			document.body.appendChild(setting);
+			setting.id='setting';
+		}
+		function Handmade(){
+			this.timer=null;
+			this.div=document.createElement('div');
+			this.div.style.width=battlefield1.div.style.width;
+			this.div.style.height=parseInt(battlefield1.div.style.width)/2+'px';
+			this.div.style.border='3px solid black';
+			let size=battlefield1.div.getBoundingClientRect();
+			this.div.style.position='absolute';
+			this.div.style.backgroundColor='#9abff3';
+			this.div.style.zIndex='0';
+			this.div.style.top=size.top+'px';
+			this.div.style.left=size.left+'px';
+			document.body.appendChild(this.div);
+			//строим внутренний div
+			function a(){	var kol=1;var k=4;//счетчик кораблей
+				for(let i=0;i<=75;i+=25){
+					let div=document.createElement('div');
+					div.style.textAlign='center';
+					div.style.position='absolute';
+					div.style.width='25%';
+					div.style.left=i+'%';
+					div.style.height='inherit';
+					div.style.border='1px solid black';
+					this.div.appendChild(div);
+					//kol ship
+					let number=document.createElement('span');
+					number.style.fontSize='130%';
+					number.innerHTML='<strong><i>'+kol+'</i></strong>';
+					//ship
+					this.ship=document.createElement('div');
+					this.ship.name=k;//имя корабля			
+					this.ship.style.width=battlefield1.getBoundingClientRect().width+'px';
+					this.ship.style.height=parseInt(this.ship.style.width)*k+'px';k--;
+					this.ship.style.backgroundColor='yellow';
+					this.ship.style.position='relative';
+					this.ship.style.marginLeft='10%';
+					//
+					div.appendChild(number);
+					div.appendChild(this.ship);
+					kol++;
+				}
+			}
+			a.call(this);
+			this.animation=function(step,height){
+				this.timer=setInterval((function(){
+					if(this.div.style.top==Math.ceil(size.top)-height+'px'){clearInterval(this.timer);this.timer=null;}else{
+					this.div.style.top=parseInt(this.div.style.top)+step+'px';}			
+				}).bind(this),5);
+			}
+		}
+		var handmade=new Handmade();
+		autoplay.addEventListener('click',function(e){
+		if(handmade.timer!==null){e.preventDefault();return;}
+			if(!autoplay.checked){
+				handmade.animation(-1,parseInt(handmade.div.style.height));//анимация для появления кораблей для расстановки
+			}else{
+				handmade.animation(1,0);//анимация для скрытия кораблей для расстановки
+				battlefield1.div.style.zIndex='1';//скрытие панели расстановки кораблей при авторасстановке
+			}
+		});
+		handmade.div.addEventListener('click',function(e){
+			if(e.target.parentNode.parentNode==this && e.target.tagName=='DIV' && +e.target.parentNode.querySelector('i').innerHTML>0 ){//проверяю что бы кликнул по кораблю  и их количество было больше 0	
+				Handmade.copy=document.createElement('div');//клонируем объект
+				Handmade.copy.id='copy';
+				Handmade.copy.orientation=10;//ориентация корабля(по горизонт-10 или по вертикали-1)
+				Handmade.copy.name=e.target.name;
+				Handmade.copy.parent=e.target.parentNode;
+				Handmade.copy.style.transform='rotate(0)';
+				Handmade.copy.style.position='fixed';
+				let size=e.target.getBoundingClientRect();
+				Handmade.copy.style.width=size.width+'px';//задаю ширину копируемого объекта
+				Handmade.copy.style.height=size.height+'px';//задаю высоту копируемого объекта#
+				Handmade.copy.style.top=size.top+'px';
+				Handmade.copy.style.left=size.left+'px';
+				document.body.appendChild(Handmade.copy);//добавляем его на страницу
+				Handmade.copy.style.backgroundColor='brown';			
+				battlefield1.div.style.zIndex='0';
+			}	
+			document.addEventListener('mousemove',function(event){
+				if(this.contains(Handmade.copy)){
+					if(Handmade.copy.style.transform=='rotate(0deg)'){
+					Handmade.copy.style.top=event.clientY-battlefield1.getBoundingClientRect().height/2+'px';
+					Handmade.copy.style.left=event.clientX-battlefield1.getBoundingClientRect().width/2+'px';
+					}else{
+					let kof=Handmade.coefficient[+Handmade.copy.name-1];
+					Handmade.copy.style.top=event.clientY-copy.getBoundingClientRect().height*kof-battlefield1.getBoundingClientRect().height/2+'px';
+					Handmade.copy.style.left=event.clientX+copy.getBoundingClientRect().height*kof-battlefield1.getBoundingClientRect().width/2+'px';
+
+					}
+				}
+			});
+			Handmade.copy.addEventListener('mousedown',function(e){//кликаем по своему полю что бы удалить "copy"
+				if(e.which==1){
+					battlefield1.sizeShip=this.name;//запоминаем размер корабля который нужно поставить
+					document.body.removeChild(this);
+				}
+			});
+			Handmade.copy.addEventListener('contextmenu',function(ev){
+				if(this.style.transform=='rotate(0deg)'){
+					this.style.transform='rotate(90deg)';
+					let kof=Handmade.coefficient[+this.name-1];
+					this.style.top=ev.clientY-this.getBoundingClientRect().height*kof-battlefield1.getBoundingClientRect().height/2+'px';
+					this.style.left=ev.clientX+this.getBoundingClientRect().height*kof-battlefield1.getBoundingClientRect().width/2+'px';
+					Handmade.copy.orientation=1;//ориентация корабля для просчета постановки на карту
+				}
+				else{
+					this.style.transform='rotate(0deg)';
+					Handmade.copy.style.top=event.clientY-battlefield1.getBoundingClientRect().height/2+'px';
+					Handmade.copy.style.left=event.clientX-battlefield1.getBoundingClientRect().width/2+'px';
+					Handmade.copy.orientation=10;//ориентация корабля для просчета постановки на карту
+				}				
+				ev.preventDefault()
+			});
+		});
+		battlefield1.div.addEventListener('mouseup',function(e){//кликаем по своему полю что бы поставить корабль
+				if(e.which!=1 || !Handmade.copy.name){return;}
+				let id=Array.prototype.indexOf.call(this.children,e.target);
+				if(id==-1)return;
+				let span=Handmade.copy.parent.querySelector('i');
+				let step=id+Handmade.copy.orientation*(+Handmade.copy.name-1);
+				if(Handmade.copy.orientation==10 && step<100){
+					if(battlefield1.createShip(1,+Handmade.copy.name,id,0)){
+						span.innerHTML=+span.innerHTML-1;//узнаем из какого подива мы взяли корабль для уменьшение счетчика кораблей в span
+					}
+				}else if(Handmade.copy.orientation==1 && ((String(id).length==2 && +String(step)[1]<=9 && String(step)[0]==String(id)[0] )|| (id+Handmade.copy.orientation*(+Handmade.copy.name-1)<=9))){
+					if(battlefield1.createShip(1,+Handmade.copy.name,id,1)){
+						span.innerHTML=+span.innerHTML-1;//узнаем из какого подива мы взяли корабль для уменьшение счетчика кораблей в span
+					}
+				}
+				Handmade.copy.name=null;
+			});
+		Handmade.coefficient=[0,0.5,1,1.5];//коэффицент для расчета установки copy 
+	</script>
+</body>
+</html>
+
